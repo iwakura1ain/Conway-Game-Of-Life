@@ -11,27 +11,33 @@ from random import randrange
 from multiprocessing import Pool
 from multiprocessing.managers import SharedMemoryManager
 
+from threading import Thread
+
 import curses
 from curses import wrapper
 
 
 class GAME:
-    MAX_Y = 100
-    MAX_X = 100
+    MAX_Y = 300
+    MAX_X = 300
     MAX_INDEX = MAX_X * MAX_Y
-    ARENA_NAME = "GameOfLife"
-    SEED_FILE = "test.seed"
-    
+        
+    SHM_MANAGER = SharedMemoryManager()
+    SHM_MANAGER.start()
+        
+    ARENA_SHM = SHM_MANAGER.SharedMemory(size=MAX_INDEX)
+    ARENA = ARENA_SHM.buf
+
     def GetXaxis(self, x, current):
-        if(self.MAX_X * int(current/self.MAX_X) <= current + x < self.MAX_X * int(current/self.MAX_X + 1)):
+        if(GAME.MAX_X * int(current/GAME.MAX_X) <= current + x < GAME.MAX_X * int(current/GAME.MAX_X + 1)):
             return current + x
         
         else:
             raise IndexError
             
     def GetYaxis(self, y, current):
-        if(0 <= current + y*self.MAX_X < self.MAX_INDEX):
-            return current + y*self.MAX_X
+        if(0 <= current + y*GAME.MAX_X < GAME.MAX_INDEX):
+            return current + y*GAME.MAX_X
         
         else:
             raise IndexError
@@ -44,189 +50,213 @@ class GAME:
         
         except IndexError:
             return None
+        
+    def GetOppositeCheck(self, check):
+        if(check == 0): return 1
+        else: return 0
+
+    def IsAlive(self, index, check): 
+        if(index is None):
+            return 0
+        else:
+            return int((copy(GAME.ARENA[index]) >> check) & 1)
+
+    # def Spawn(self, index, check): # set current cell bit to 1
+    #     try:
+    #         temp = copy(GAME.ARENA[self.index])
+    #         GAME.ARENA[self.index] = temp | (1 << self.dest_check)
+    #         return True
+        
+    #     except IndexError:
+    #         pass
     
+    # def Kill(self, index, check): # set current cell bit to 0
+    #     try:
+    #         temp = copy(GAME.ARENA[self.index])
+    #         GAME.ARENA[self.index] = temp & ~(1 << self.dest_check)
+    #         return True
+        
+    #     except IndexError:
+    #         pass
+   
+
 class Overlord(GAME):
     def __init__(self, child_num=cpu_count()):
         self.timer = None #TODO: Implement timer
         self.generation = 0            
         self.check = 0
-        self.temp = 1
         
-        self.shm_manager = SharedMemoryManager()
-        self.shm_manager.start()
+        #self.shm_manager = SharedMemoryManager()
+        #self.shm_manager.start()
         
-        self.arena_shm = self.shm_manager.SharedMemory(size=self.MAX_INDEX)
-        self.arena = self.arena_shm.buf
+        #self.arena_shm = self.shm_manager.SharedMemory(size=GAME.MAX_INDEX)
+        #self.arena = self.arena_shm.buf
 
         self.child_num = child_num
-        self.child_pool = Pool(processes=self.child_num)        
+        self.child_pool = Pool(processes=self.child_num)
 
+    def SwapCheck(self):
+        temp = self.check
+        self.check = self.GetOppositeCheck(self.check)
+        return temp
+
+    def SeedRand(self):
+        for i in [randrange(0, GAME.MAX_INDEX) for j in range(GAME.MAX_INDEX)]:
+            temp = copy(GAME.ARENA[i])
+            GAME.ARENA[i] = temp | (1 << self.check)
         
     def RunChildren(self):
-        #call child with args (index, check, arena_shm)
-        return self.child_pool.starmap(RunChild, zip(range(self.MAX_INDEX),
-                                                     repeat(self.check),
-                                                     repeat(self.arena_shm)))
-
-    
-    
-    def SwapCheck(self):
-        self.generation += 1
-        self.check, self.temp = self.temp, self.check
-        return self.check
+        #call RunChild( [[index, check] * chunksize] )
+        result = self.child_pool.starmap(RunChild,
+                                         zip(range(GAME.MAX_INDEX), repeat(self.check)),
+                                         chunksize=30)
+        prev_check = self.SwapCheck()
         
-    def JoinChildren(self):
-        self.shm_manager.shutdown()
-
-        self.child_pool.close()
-        self.child_pool.join()    
-        
-    def SeedRand(self):
-        for i in [randrange(0, self.MAX_INDEX) for j in range(self.MAX_INDEX)]:
-            temp = copy(self.arena[i])
-            self.arena[i] = temp | (1 << self.check)
-
-    def SeedFile(self, x=0, y=0):
+        return prev_check
+    
+    def SeedChildren(self, x=0, y=0):
         seed_index = []
         
-        with open(self.SEED_FILE, "r") as fd: #TODO: cleanup needed
+        with open("test.seed", "r") as fd: 
             lines = fd.readlines()
-            for linum, line in enumerate(lines):
-                for i, c in enumerate(line):
-                    if(c == "O"):
-                        index = self.GetOffset(x+i, y+linum, 0)
-                        if(i is not None):
-                            seed_index.append(index)
+            for row, line in enumerate(lines):
+                for col, char in enumerate(line):
+                    if(char == "O"):
+                        seed_index.append(self.GetOffset(x+col, y+row, 0))
                         
-        #call child with args (seed_index, check, arena_shm)
-        return self.child_pool.starmap(SeedChildren, zip(seed_index,
-                                                         repeat(self.check),
-                                                         repeat(self.arena_shm)))
-
-def SeedChildren(index, check, shm):
-        current = Child(index, check, shm)
-        state = current.SetSeed()
-        
-        return state
-        
-def RunChild(index, check, shm):
-    #resource_tracker.unregister(shm._name, "shared_memory")
-        
-    current = Child(index, check, shm)
-    state = current.CalcGeneration()
+        #call SeedChild( [[index, check] * chunksize] )
+        result = self.child_pool.starmap(SeedChild,
+                                         zip(filter(lambda i: i is not None, seed_index), repeat(self.check)))
     
-    return index, current.IsAlive(current.index), current.neighbour_cnt, state
-
-class Child(GAME):
-    def __init__(self, index, check, shm):
-        self.index = index
-        
-        #self.arena_shm = shared_memory.SharedMemory(name=self.ARENA_NAME, create=False)
-        #self.arena = self.arena_shm.buf
-        self.arena_shm = shm
-        self.arena = self.arena_shm.buf
-                
-        self.check = check
-        self.neighbour_cnt = self.GetNeighbors()
-        
-    def DestCheck(self):
-        if(self.check == 0):
-            return 1
-        else:
-            return 0
-        
-    def Spawn(self, dest): # set bit to 1
+    def JoinChildren(self):
         try:
-            temp = copy(self.arena[self.index])
-            self.arena[self.index] = temp | (1 << dest)
-            return True
-        except IndexError:
-            return False
-        
-        
-    def Kill(self, dest): # set bit to 0
-        try:
-            temp = copy(self.arena[self.index])
-            self.arena[self.index] = temp & ~(1 << dest)
-            return True
-        except IndexError:
-            return False
-        
-    def IsAlive(self, i):
-        if(i is None):
-            return 0
-        else:
-            return int((copy(self.arena[i]) >> self.check) & 1)
-        
-    def GetNeighbors(self):
-        count = 0
-        # for x in range(-1, 2):
-        #     for y in range(-1, 2):
-        #         if(x != 0 and y != 0):
-        #             count += self.IsAlive(self.GetOffset(x, y))
-        
-        count += self.IsAlive(self.GetOffset(-1, -1, self.index))
-        count += self.IsAlive(self.GetOffset(-1, 0, self.index))
-        count += self.IsAlive(self.GetOffset(-1, 1, self.index))
-        count += self.IsAlive(self.GetOffset(0, -1, self.index))
-        count += self.IsAlive(self.GetOffset(0, 1, self.index))
-        count += self.IsAlive(self.GetOffset(1, -1, self.index))
-        count += self.IsAlive(self.GetOffset(1, 0, self.index))
-        count += self.IsAlive(self.GetOffset(1, 1, self.index))
-        
-        return count
-    
-    def CalcGeneration(self):
-        if(self.IsAlive(self.index) == 1 and self.neighbour_cnt in [2, 3]):
-            # Any live cell with two or three live neighbours survives.
-            return self.Spawn(self.DestCheck())
+            GAME.shm_manager.shutdown()
+            GAME.child_pool.close()
+            GAME.child_pool.join()
             
-        elif(self.IsAlive(self.index) == 0 and self.neighbour_cnt in [3]):
+        except:
+            pass #TODO
+
+# def SeedChild(args):
+#     current = Child()
+#     for arg in args:
+#         current.SetSeed(arg[0], arg[1])
+
+# def RunChild(args):
+#     current = Child()
+#     for arg in args:
+#         current.CalcGeneration(arg[0], arg[1])
+
+def SeedChild(index, check):
+    current = Child()
+    current.SetSeed(index, check)
+
+def RunChild(index, check):
+    current = Child()
+    current.CalcGeneration(index, check)
+    
+class Child(GAME):
+    def __init__(self):
+        self.index = None
+        self.check = None
+        self.dest_check = None
+    
+    def Spawn(self): # set current cell bit to 1
+        try:
+            temp = copy(GAME.ARENA[self.index])
+            GAME.ARENA[self.index] = temp | (1 << self.dest_check)
+            return True
+        
+        except IndexError:
+            pass
+    
+    def Kill(self): # set current cell bit to 0
+        try:
+            temp = copy(GAME.ARENA[self.index])
+            GAME.ARENA[self.index] = temp & ~(1 << self.dest_check)
+            return True
+        
+        except IndexError:
+            pass
+        
+    def GetArea(self):
+        current = 0
+        neighbours = 0
+
+        #TODO: Weird bug here, most likely python reusing locations across iterations.
+        #    Workaround is to iterate all neighbours manually... 
+        neighbours += self.IsAlive(self.GetOffset(-1, -1, self.index), self.check )
+        neighbours += self.IsAlive(self.GetOffset(-1, 0, self.index), self.check )
+        neighbours += self.IsAlive(self.GetOffset(-1, 1, self.index), self.check )
+        neighbours += self.IsAlive(self.GetOffset(0, -1, self.index), self.check )
+        neighbours += self.IsAlive(self.GetOffset(0, 1, self.index), self.check )
+        neighbours += self.IsAlive(self.GetOffset(1, -1, self.index), self.check )
+        neighbours += self.IsAlive(self.GetOffset(1, 0, self.index), self.check )
+        neighbours += self.IsAlive(self.GetOffset(1, 1, self.index), self.check )
+        
+        current = self.IsAlive(self.index, self.check )
+        
+        return current, neighbours
+    
+    def CalcGeneration(self, index, check):
+        self.index = index
+        self.check = check
+        self.dest_check = self.GetOppositeCheck(check)
+        
+        current, neighbours = self.GetArea()
+        if(current == 1 and neighbours in [2, 3]):
+            # Any live cell with two or three live neighbours survives.
+            return self.Spawn()
+            
+        elif(current == 0 and neighbours in [3]):
             # Any dead cell with three live neighbours becomes a live cell.
-            return self.Spawn(self.DestCheck())
+            self.Spawn()
             
         else:
             # All other live cells die in the next generation. Similarly, all other dead cells stay dead.
-            return self.Kill(self.DestCheck())
-            
-        #self.arena_shm.close()
+            self.Kill()
+    
+    def SetSeed(self, index, check):
+        self.index = index
+        self.dest_check = check        
+        self.Spawn()
 
-    def SetSeed(self):
-        return self.Spawn(self.check)
+# def RunDisplay(display):
+#     d = display
+
+#     while(True):
+        
     
 class Display(GAME):    
     CELLS = ["  ", "██"]
     #HIGHLIGHT_COL = curses.init_pair(1, curses.COLOR_RED, curses.COLOR_RED)
     #REGULAR_COL = curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_BLACK)
     
-    def __init__(self, arena_shm, stdscr):
-        self.arena_shm = arena_shm
-        self.arena = self.arena_shm.buf
+    def __init__(self, stdscr):
         self.check = 0
 
         self.stdscr = stdscr
         curses.curs_set(False)
-        self.pad = curses.newpad(self.MAX_Y, self.MAX_X*2)
-                
-    def IsAlive(self, index):
-        return (copy(self.arena[index]) >> self.check) & 1
+        curses.start_color()
+        stdscr.nodelay(True)
 
+        self.pad = curses.newpad(GAME.MAX_Y, GAME.MAX_X*2)
+        self.pad_coord = [0,0]
+        
     def GetNextCell(self):
         index = 0
         x, y = 0, 0
-        while(index < self.MAX_INDEX):
-            yield y, x, self.CELLS[self.IsAlive(index)]
-
+        while(index < GAME.MAX_INDEX):
+            yield y, x, self.CELLS[self.IsAlive(index, self.check)]
+            
             index += 1
-            if(int(index/self.MAX_X) > y):
+            if(int(index/GAME.MAX_X) > y):
                 x = 0
                 y += 1
             else:
                 x += 2
-
-                
     
-    def RefreshPadContents(self):
+    def RefreshPad(self):
         for y, x, cell in self.GetNextCell():
             try: 
                 self.pad.addstr(y, x, cell)
@@ -234,51 +264,33 @@ class Display(GAME):
                 pass
         
         self.pad.refresh(0,0, 1,2, curses.LINES-1,curses.COLS-1)
-            
-    # def PrintArenaIndex(self, x, y):
-    #     print(f" {bin(self.arena[y*self.MAX_X + x]): <4} ")
+        #self.check = self.GetOppositeCheck(self.check)
 
-    # def PrintResultIndex(self, x, y):
-    #     for i in self.pool_result:
-    #         if(i[0] == y*self.MAX_X + x):
-    #             print(i)
-    #             return
+    def Intro(self):
+        self.stdscr.nodelay(False)
+
+        self.stdscr.addstr(int(curses.LINES/2), int(curses.COLS/2),   "Game Of Life by John Conway")
+        self.stdscr.addstr(int(curses.LINES/2)+1, int(curses.COLS/2), "  Press any key to start...")
+        self.stdscr.getch()
+
+        self.stdscr.nodelay(True)
+        self.stdscr.clear()
             
-    # def PrintResult(self):
-    #     for y in range(self.MAX_Y):
-    #         for x in range(self.MAX_X):
-    #             print(self.pool_result[y*self.MAX_X + x])
-    #         print("\n", end="")
-        
-    # def PrintArena(self):
-    #     for y in range(self.MAX_Y):
-    #         for x in range(self.MAX_X):
-    #             #print(f" {bin(self.arena[y*self.MAX_X + x]): <4} ", end="")
-    #             if(self.IsAlive(y*self.MAX_X + x) == 1):
-    #                 print("O", end="")
-    #             else:
-    #                 print("X", end="")
-    #         print("\n", end="")
-            
-    #     print("\n", end="")
-    #     print("\n", end="")
-    
 def main(stdscr):
+    o = Overlord()
+    d = Display(stdscr)
     
-    a = Overlord()
-    p = Display(a.arena_shm, stdscr)
-    
-    #a.SeedRand()
-    a.SeedFile()
-    p.RefreshPadContents()
+    #o.SeedChildren()
+    o.SeedRand()
+    d.RefreshPad()
+    sleep(1)
 
     while(True):
-        p.pool_result = a.RunChildren()
-        p.check = a.SwapCheck()
-        p.RefreshPadContents()
-        sleep(0.1)
+        d.check = o.RunChildren()    
+        d.RefreshPad()
+        #sleep(0.01)
         
-    a.JoinChildren()
+    o.JoinChildren()
     
 if __name__=="__main__":
     wrapper(main)
