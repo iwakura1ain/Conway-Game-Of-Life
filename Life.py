@@ -353,8 +353,6 @@ def main(stdscr):
         
     o.JoinChildren()
     
-    Overlord.StartOverlord(o)
-    
 if __name__=="__main__":
     wrapper(main)
     
