@@ -24,8 +24,6 @@ class Overlord(GAME):
         self.child_num = child_num
         self.child_pool = Pool(processes=self.child_num)  # child process pool
 
-        self.template = Child()
-
     def SwapCheck(self) -> int:
         """ Swaps the check index after every generation, returns the previous check index. """
 
@@ -91,8 +89,8 @@ class Overlord(GAME):
 
         #call SeedChild( [[index, check] * chunksize] )
         result = self.child_pool.starmap(Child.SeedChild,
-                                         zip(repeat(GAME.ARENA_SHM),
-                                             filter(lambda i:i is not None, seed_index),
+                                         zip(repeat(GAME),
+                                             filter(lambda i: i is not None, seed_index),
                                              repeat(self.check)),
                                          chunksize=30)
 
@@ -124,22 +122,21 @@ class Child(GAME):
     def SeedChild(template, index: int, check: int) -> None:
         """ Process entry point for Overlord.SeedRand(). """
 
-        current = template
+        current = Child()
         current.SetSeed(index, check)
 
     @staticmethod
-    def RunChild(arena_shm, index: int, check: int) -> None:
+    def RunChild(game, index: int, check: int) -> None:
         """ Process entry point for Overlord.RunChildren(). """
 
         current = Child()
-        GAME.SetSharedMemory(arena_shm)
         current.CalcGeneration(index, check)
 
     def __init__(self):
         self.index = None  # Current index being calculated
         self.check = None  # Bit index being read
         self.dest_check = None  # Bit index being written
-        
+        #GAME.SetSharedMemory(shm)
 
     def Spawn(self) -> None:
         """ Set current cell bit to 1. """

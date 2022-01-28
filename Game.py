@@ -5,11 +5,7 @@ from copy import copy
 from multiprocessing.managers import SharedMemoryManager
 from multiprocessing import Event
 
-import logging as l
 
-
-# logging configuration 
-l.basicConfig(level=l.DEBUG, filename="log.txt", filemode="w", format='%(message)s')
 
 
 class GAME:
@@ -21,25 +17,25 @@ class GAME:
     MAX_INDEX = MAX_X * MAX_Y  # index length of shared memory
 
     # shared memory manager process
-    #SHM_MANAGER = SharedMemoryManager()
-    #SHM_MANAGER.start()
-    SHM_MANAGER = None
+    SHM_MANAGER = SharedMemoryManager()
+    SHM_MANAGER.start()
+    #SHM_MANAGER = None
 
     # singular shared memory identifier
-    #ARENA_SHM = SHM_MANAGER.SharedMemory(size=MAX_INDEX)
-    #ARENA = ARENA_SHM.buf
-    ARENA_SHM = None
-    ARENA = None
+    ARENA_SHM = SHM_MANAGER.SharedMemory(size=MAX_INDEX)
+    ARENA = ARENA_SHM.buf
+    #ARENA_SHM = None
+    #ARENA = None
 
     # event for calculation start
-    #CALC_EVENT = Event()
-    #CALC_EVENT.set()
-    CALC_EVENT = None
+    CALC_EVENT = Event()
+    CALC_EVENT.set()
+    #CALC_EVENT = None
 
     # event for display read start
-    #DISPLAY_EVENT = Event()
-    #DISPLAY_EVENT.clear()
-    DISPLAY_EVENT = None
+    DISPLAY_EVENT = Event()
+    DISPLAY_EVENT.clear()
+    #DISPLAY_EVENT = None
 
     @classmethod
     def InitSharedMemory(cls):

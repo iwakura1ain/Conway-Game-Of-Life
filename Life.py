@@ -6,23 +6,29 @@ __author__ = "https://github.com/iwakura1ain"
 __version__ = "WIP"
 
 import Game
-from Game import l
 import Execute
 import Display
 
 from curses import wrapper
 
+import logging as l
+
+# logging configuration 
+l.basicConfig(level=l.DEBUG, filename="log.txt", filemode="w", format='%(message)s')
+
         
 def main(stdscr):    
     # create Overlord class, initialize process pool
+    
+    #Game.GAME.InitSharedMemory()
+    #Game.GAME.InitEvents()
+
     o = Execute.Overlord()
     l.debug("overlord created")
 
     d = Display.Display(stdscr)
     l.debug("display created")
 
-    Game.GAME.InitSharedMemory()
-    Game.GAME.InitEvents()
 
     o.SeedRand()
     #o.SeedChildren()
