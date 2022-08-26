@@ -6,8 +6,6 @@ from multiprocessing.managers import SharedMemoryManager
 from multiprocessing import Event
 
 
-
-
 class GAME:
     """ Global class inherited across all classes. Access to shared memory, events, and max lengths. """
 
@@ -111,6 +109,11 @@ class GAME:
             return 0
         else:
             return int((copy(GAME.ARENA[index]) >> check) & 1)
+
+
+
+
+
 
 
 

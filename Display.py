@@ -154,7 +154,7 @@ class Display(GAME):
            and (self.cursor_x + curses.COLS + arrow_controls[ch][1] < self.arena_x)):
             self.cursor_x += arrow_controls[ch][1]
 
-
+        
 
 
 

@@ -1,0 +1,100 @@
+overlord created
+display created
+waiting for calc event
+calc event received, seeding random
+seed rand finished, display event set
+display started
+========= generation start ===========
+waiting for calc event
+display event received, updating arena
+display coordinates wrong
+arena updated, calc event set
+calc event received, running children
+run children finished, display event set
+========= generation finish ==========
+display event received, updating arena
+========= generation start ===========
+waiting for calc event
+display coordinates wrong
+arena updated, calc event set
+calc event received, running children
+run children finished, display event set
+display event received, updating arena
+========= generation finish ==========
+========= generation start ===========
+waiting for calc event
+display coordinates wrong
+arena updated, calc event set
+calc event received, running children
+run children finished, display event set
+========= generation finish ==========
+display event received, updating arena
+========= generation start ===========
+waiting for calc event
+display coordinates wrong
+arena updated, calc event set
+calc event received, running children
+run children finished, display event set
+display event received, updating arena
+========= generation finish ==========
+========= generation start ===========
+waiting for calc event
+display coordinates wrong
+arena updated, calc event set
+calc event received, running children
+run children finished, display event set
+========= generation finish ==========
+========= generation start ===========
+waiting for calc event
+display event received, updating arena
+display coordinates wrong
+arena updated, calc event set
+calc event received, running children
+run children finished, display event set
+display event received, updating arena
+========= generation finish ==========
+========= generation start ===========
+waiting for calc event
+display coordinates wrong
+arena updated, calc event set
+calc event received, running children
+run children finished, display event set
+========= generation finish ==========
+display event received, updating arena
+========= generation start ===========
+waiting for calc event
+display coordinates wrong
+arena updated, calc event set
+calc event received, running children
+run children finished, display event set
+display event received, updating arena
+========= generation finish ==========
+========= generation start ===========
+waiting for calc event
+display coordinates wrong
+arena updated, calc event set
+calc event received, running children
+run children finished, display event set
+========= generation finish ==========
+========= generation start ===========
+display event received, updating arena
+waiting for calc event
+display coordinates wrong
+arena updated, calc event set
+calc event received, running children
+run children finished, display event set
+display event received, updating arena
+========= generation finish ==========
+========= generation start ===========
+waiting for calc event
+display coordinates wrong
+arena updated, calc event set
+calc event received, running children
+run children finished, display event set
+display event received, updating arena
+========= generation finish ==========
+========= generation start ===========
+waiting for calc event
+display coordinates wrong
+arena updated, calc event set
+calc event received, running children

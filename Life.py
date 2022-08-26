@@ -30,6 +30,8 @@ def main(stdscr):
     l.debug("display created")
 
 
+
+    
     o.SeedRand()
     #o.SeedChildren()
 
